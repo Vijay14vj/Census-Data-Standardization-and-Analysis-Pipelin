@@ -1,0 +1,302 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Dec  1 09:44:37 2024
+
+@author: vijay
+"""
+
+import pandas as pd 
+import json
+from pymongo import MongoClient
+import streamlit as st
+import mysql.connector
+
+
+
+#Task-1 , renaming all columns by passing columns in file
+    
+def Load_data_csv_file(csv_filepath):
+    dataframe=pd.read_csv(csv_filepath)
+    return dataframe
+    
+def Load_column_pathing_file(file_path):
+    
+
+# Load the dictionary
+    with open(file_path, "r") as file:
+        csv_to_table_mapping = json.load(file)
+        return csv_to_table_mapping    
+
+def renaming_mapped_files(dataframe,mapped_tables):
+    dataframe.rename(columns=mapped_tables,inplace=True)
+    
+# Task-2 , renaming state name start with caps and where 'and' should lower 
+def state_name_renaming(dataframe):
+    dataframe['State'] = dataframe['State'].apply(
+    lambda x: ' '.join([word.capitalize() if word.lower() != 'and' else word.lower() for word in x.split(' ')]))
+    return dataframe
+
+#Task-3, changing state name for particular district of Telangana and Ladakh
+def distric_name_changing(dataframe,telaganna_file,Ladakh_file):
+    var=telaganna_file
+    var1=Ladakh_file
+    dataframe.loc[dataframe['District'].isin(var),'State']='Telaganna'
+    dataframe.loc[dataframe['District'].isin(var1),'State']='Ladakh'
+    return dataframe
+
+# Task-4,find the missing values of columns using formulae (data cleaning)(pending)
+def missing_values_finding(dataframe):
+    # Task 4: Missing Data Calculation and Filling
+    #Total_population(Male,female)
+    dataframe['Total_Population'] = dataframe['Male'] + dataframe['Female']
+    dataframe['Male'] = dataframe['Total_Population'] - dataframe['Female']
+    dataframe['Female'] = dataframe['Total_Population'] - dataframe['Male']
+    #total literate
+    dataframe['Literate']=dataframe['Male_Literate']+dataframe['Female_Literate']
+    dataframe['Male_Literate'] = dataframe['Literate'] - dataframe['Female_Literate']
+    dataframe['Female_Literate'] = dataframe['Literate'] - dataframe['Male_Literate']
+    #total SC
+    dataframe['Sc'] = dataframe['Male_Sc'] + dataframe['Female_Sc']
+    dataframe['Male_Sc'] = dataframe['Sc'] - dataframe['Female_Sc']
+    dataframe['Female_Sc'] = dataframe['Sc'] - dataframe['Male_Sc']
+    #total st
+    dataframe['ST'] = dataframe['Male_ST'] + dataframe['Female_ST']
+    dataframe['Male_ST'] = dataframe['ST'] - dataframe['Female_ST']
+    dataframe['Female_ST'] = dataframe['ST'] - dataframe['Male_ST']
+    #workers
+    dataframe['workers'] = dataframe['Male_workers'] + dataframe['Female_workers']
+    dataframe['Main_workers'] = dataframe['workers'] + dataframe['Marginal_workers']
+    dataframe['Non-workers'] = dataframe['Population'] + dataframe['Workers']
+    dataframe['Cultivators'] = dataframe['workers'] + dataframe['agri_workers'] + dataframe['HH_workers'] + dataframe['others']
+    #Religions
+    dataframe['Hindu'] = dataframe['Population'] - dataframe['Muslims'] - dataframe['Christians'] - dataframe['sikhs'] - dataframe['Buddist'] - dataframe['Jains'] - dataframe['others'] - dataframe['not_stated']
+    dataframe['Muslims'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Christians'] - dataframe['sikhs'] - dataframe['Buddist'] - dataframe['Jains'] - dataframe['others'] - dataframe['not_stated']
+    dataframe['Christians'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Muslims'] - dataframe['sikhs'] - dataframe['Buddist'] - dataframe['Jains'] - dataframe['others'] - dataframe['not_stated']
+    dataframe['sikhs'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Muslims'] - dataframe['Christians'] - dataframe['Buddist'] - dataframe['Jains'] - dataframe['others'] - dataframe['not_stated']
+    dataframe['Buddist'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Muslims'] - dataframe['Christians'] - dataframe['sikhs'] - dataframe['Jains'] - dataframe['others'] - dataframe['not_stated']
+    dataframe['Jains'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Muslims'] - dataframe['Christians'] - dataframe['sikhs'] - dataframe['Buddist'] - dataframe['others'] - dataframe['not_stated']
+    dataframe['others'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Muslims'] - dataframe['Christians'] - dataframe['sikhs'] - dataframe['Buddist'] - dataframe['Jains'] - dataframe['not_stated']
+    dataframe['not_stated'] = dataframe['Population'] - dataframe['Hindu'] - dataframe['Muslims'] - dataframe['Christians'] - dataframe['sikhs'] - dataframe['Buddist'] - dataframe['Jains'] - dataframe['others']
+    #households
+    dataframe['Total_HH'] = dataframe['Urban'] + dataframe['Rural']
+    dataframe['Urban'] = dataframe['Total_HH'] - dataframe['Rural']
+    dataframe['Rural'] = dataframe['Total_HH'] - dataframe['Urban']
+    #literate and iliterate
+    dataframe['Total_education'] = dataframe['Literate_education'] + dataframe['iliterate_education']
+    dataframe['Literate_education'] = dataframe['Total_education'] - dataframe['iliterate_education']
+    dataframe['iliterate_education'] = dataframe['Total_education'] - dataframe['Literate_education']
+    #education on classifications
+    dataframe['Literate_education'] = dataframe['Below_primary'] + dataframe['Primary'] + dataframe['Middle'] + dataframe['Second'] + dataframe['Higher'] + dataframe['Graduated'] + dataframe['others']
+    dataframe['Below_primary'] = dataframe['Literate_education'] - (dataframe['Primary'] + dataframe['Middle'] + dataframe['Second'] + dataframe['Higher'] + dataframe['Graduated'] + dataframe['others'])
+    dataframe['Primary'] = dataframe['Literate_education'] - (dataframe['Below_primary'] + dataframe['Middle'] + dataframe['Second'] + dataframe['Higher'] + dataframe['Graduated'] + dataframe['others'])
+    dataframe['Middle'] = dataframe['Literate_education'] - (dataframe['Below_primary'] + dataframe['Primary'] + dataframe['Second'] + dataframe['Higher'] + dataframe['Graduated'] + dataframe['others'])
+    dataframe['Second'] = dataframe['Literate_education'] - (dataframe['Below_primary'] + dataframe['Primary'] + dataframe['Middle'] + dataframe['Higher'] + dataframe['Graduated'] + dataframe['others'])
+    dataframe['Higher'] = dataframe['Literate_education'] - (dataframe['Below_primary'] + dataframe['Primary'] + dataframe['Middle'] + dataframe['Second'] + dataframe['Graduated'] + dataframe['others'])
+    dataframe['Graduated'] = dataframe['Literate_education'] - (dataframe['Below_primary'] + dataframe['Primary'] + dataframe['Middle'] + dataframe['Second'] + dataframe['Higher'] + dataframe['others'])
+    dataframe['others'] = dataframe['Literate_education'] - (dataframe['Below_primary'] + dataframe['Primary'] + dataframe['Middle'] + dataframe['Second'] + dataframe['Higher'] + dataframe['Graduated'])
+    #total age group
+    dataframe['age_0_29'] = dataframe['Population'] - dataframe['age_30_49'] - dataframe['age_50'] - dataframe['age_not_stated']
+    dataframe['age_30_49'] = dataframe['Population'] - (dataframe['age_0_29'] + dataframe['age_50'] + dataframe['age_not_stated'])
+    dataframe['age_50'] = dataframe['Population'] - (dataframe['age_0_29'] + dataframe['age_30_49'] + dataframe['age_not_stated'])
+    dataframe['age_not_stated'] = dataframe['Population'] - (dataframe['age_0_29'] + dataframe['age_30_49'] + dataframe['age_50'])
+    #households with 1 to 3 persons
+    dataframe['HH_1_TO_2_person'] = dataframe['HH_1_person'] + dataframe['HH_2_person']
+    dataframe['HH_1_person'] = dataframe['HH_1_TO_2_person'] - dataframe['HH_2_person']
+    dataframe['HH_2_person'] = dataframe['HH_1_TO_2_person'] - dataframe['HH_1_person']
+    #households with 3 to 5 persons
+    dataframe['HH_3_TO_5_person'] = dataframe['HH_3_person'] + dataframe['HH_4_person'] + dataframe['HH_5_person']
+    dataframe['HH_3_person'] = dataframe['HH_3_TO_5_person'] - (dataframe['HH_4_person'] + dataframe['HH_5_person'])
+    dataframe['HH_4_person'] = dataframe['HH_3_TO_5_person'] - (dataframe['HH_3_person'] + dataframe['HH_5_person'])
+    dataframe['HH_5_person'] = dataframe['HH_3_TO_5_person'] - (dataframe['HH_3_person'] + dataframe['HH_4_person'])
+    # power parity
+    power_columns = [
+    'Power_Under_45k', 'Power_45k_90k', 'Power_90k_150k', 'Power_45k_150k',
+    'Power_150k_240k', 'Power_240k_330k', 'Power_150k_330k', 'Power_330k_425k',
+    'Power_425k_545k', 'Power_330k_545k', 'Power_Over_545k']
+
+    for col in power_columns:
+        dataframe[col] = dataframe['Total_Power'] - dataframe[power_columns].sum(axis=1) + dataframe[col]
+
+
+
+    # Percentage of missing data per column
+    missing_data = dataframe.isnull().mean() * 100
+    st.header("Missing Data Percentage")
+    st.write(missing_data)
+
+
+
+#Task-5, saving cleaned data into MongoDB
+# Function to establish a connection to MongoDB
+def connect_to_mongo():
+    try:
+        client = MongoClient("mongodb://localhost:27017/")
+        print("Connected to MongoDB successfully!")
+        return client
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {e}")
+        return None
+
+# Function to create a database and collection
+def create_database_and_collection(client, dataframe, db_name, collection_name):
+    db = client[db_name]
+    collection = db[collection_name]
+    collection.insert_many(dataframe.to_dict('records'))
+    print("Data successfully inserted into MongoDB!")
+    return collection
+
+#Task-6, Fetching proceed daat from MongoDB into MYSQL 
+# MySQL connection and data upload
+def save_to_mysql(dataframe, db_name, collection_name):
+    try:
+        client = connect_to_mongo()
+        if not client:
+            raise ConnectionError("Failed to connect to MongoDB.")
+        
+        db = client[db_name]
+        collection = db[collection_name]
+        
+        mongo_read = list(collection.find())
+        if not mongo_read:
+            print("No data found in the MongoDB collection.")
+            return
+        
+        mongo_df = pd.DataFrame(mongo_read)
+        mongo_df.drop('_id', axis=1, inplace=True)
+        
+        # Load insert query from file
+        insert_query = load_insert_query('insert_query.sql')
+        
+        if insert_query:
+            execute_insert_query(insert_query, mongo_df)
+        
+    except Exception as e:
+        print(f"An error occurred: {e}")
+def load_ddl_query(DDL_file):
+    try:
+        with open(DDL_file, 'r') as file:
+            return file.read()
+    except FileNotFoundError:
+        print(f"Error: The file {DDL_file} was not found.")
+        return None
+def execute_ddl_query(ddl_query):
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="Vijay1414@#",
+            database="Census_db"
+        )
+        cursor = connection.cursor()
+        cursor.execute(ddl_query)  # Execute the DDL query
+        connection.commit()
+        print("Table created successfully.")
+    except mysql.connector.Error as err:
+        print(f"MySQL Error: {err}")
+    finally:
+        cursor.close()
+        connection.close()
+        if ddl_query:
+            # Execute the DDL query if it's loaded successfully
+            execute_ddl_query(ddl_query)
+# Load the insert query from a file
+def load_insert_query(insert_file):
+    try:
+        with open(insert_file, 'r') as file:
+            return file.read()
+    except FileNotFoundError:
+        print(f"Error: The file {insert_file} was not found.")
+        return None
+
+# Execute the insert query
+def execute_insert_query(insert_query, mongo_df):
+    try:
+        connection = connect_to_database()
+        cursor = connection.cursor()
+        
+        for index, row in mongo_df.iterrows():
+            data = row.to_dict()
+            cursor.execute(insert_query, data)  # Execute insert with parameters
+            connection.commit()
+        
+        print("Data successfully uploaded to MySQL.")
+    except mysql.connector.Error as err:
+        print(f"Error inserting data: {err}")
+    finally:
+        cursor.close()
+        connection.close()
+
+#Task-7 , run  queries for below questions using streamlit 
+# Function to connect to the MySQL database
+def connect_to_database():
+    return mysql.connector.connect(
+        host='localhost',
+        user='root',
+        password='Vijay1414@#',
+        database='Census_db'
+    )
+
+# Load queries from a file
+def load_queries(Queries_file):
+    try:
+        with open(Queries_file, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        st.error(f"Error: The file {Queries_file} was not found.")
+        return {}
+    except json.JSONDecodeError:
+        st.error("Error: Failed to decode the JSON file.")
+        return {}
+
+# Run a query
+def run_query(query):
+    try:
+        connection = connect_to_database()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(query)
+        result = cursor.fetchall()
+        connection.close()
+        return pd.DataFrame(result)
+    except mysql.connector.Error as err:
+        st.error(f"Error: {err}")
+        return pd.DataFrame()
+
+# Display query results using Streamlit
+def display_query_results():
+    queries = load_queries('queries.json')
+    try:
+        query_number = st.selectbox('Select a Query:', list(queries.keys()))
+        query = queries[query_number]
+        result = run_query(query)
+        st.write(f"Results for Query {query_number}:", result)
+    except Exception as e:
+        st.error(f"Error executing query: {e}")
+
+
+ #handler for all files and function call   
+def main():
+    
+    csv_filepath="C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\census_2011_csv.csv"
+    dataframe=Load_data_csv_file(csv_filepath)
+    file_path = "C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\column_mapping.json"
+    mapped_tables=Load_column_pathing_file(file_path)
+    telaganna_file="C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\telaganna_file.txt"
+    Ladakh_file="C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\Ladakh_file.txt"
+    Queries_file="C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\queries.json"
+    DDL_file="C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\ddl_query.sql"
+    insert_file="C:\\Users\\vijay\\OneDrive\\Documents\\captone_project\\insert_query.sql"
+    client = connect_to_mongo()
+    st.title("Census Data Analysis")
+    display_query_results()
+    if client:
+        # Save data to MySQL
+        create_database_and_collection(client, dataframe, "Census_db", "census")
+
+       # Insert data into MongoDB
+        save_to_mysql(dataframe, "Census_db", "census")
+
+    
+       
+       
+       
+    
